@@ -46,5 +46,5 @@ def main():
             if os.path.isfile(file): os.remove(file)
 
 if __name__ == "__main__":
-    if 'GITHUB_WORKSPACE' in os.environ: sys.exit()
+    if not 'M2FIX_POSTBUILD_INSTALL' in os.environ: sys.exit()
     main()
