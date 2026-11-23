@@ -20,22 +20,29 @@ This is a fix that adds custom resolutions, mod support and more to Metal Gear S
 - [Operation Night Strikers](https://store.steampowered.com/app/3099790/Operation_Night_Strikers/)
 - Namco Museum Archives: [(Vol. 1)](https://store.steampowered.com/app/1250250/NAMCO_MUSEUM_ARCHIVES_Vol_1/) / [(Vol. 2)](https://store.steampowered.com/app/1254620/NAMCO_MUSEUM_ARCHIVES_Vol_2/)
 
-See Lyall's [MGSHDFix](https://github.com/ShizCalev/MGSHDFix) for the other games in the MGS Master Collection (Vol. 1).
+See [MGSHDFix](https://github.com/ShizCalev/MGSHDFix) for games in the MGS Master Collection (Vol. 1).
 
-See ShizCalev's [MGSPatriotFix](https://github.com/ShizCalev/MGSPatriotFix) for the other games in the MGS Master Collection (Vol. 2).
+See [MGSPatriotFix](https://github.com/ShizCalev/MGSPatriotFix) for games in the MGS Master Collection (Vol. 2).
 
-## Features
-- ~~Upscaled render resolution (MGS 1).~~ Fixed by Konami officially via patch 3.0.0 on 12th February 2026.
-- Widescreen support (MGS 1).
+## Bugfixes
+- Fixes audio distortion in Castlevania Anniversary Collection & Contra Anniversary Collection on stereo audio devices/headphones.
+- Fixes G-Darius HD launching partially offscreen in mixed resolution multi-monitor enviroments.
+- Fixes Alt-F4 sometimes leaving the game stuck running in the background & needing to use task manager to actually exit.
+
+## Shared Features
 - Borderless/windowed mode.
+- CRT gamma correction.
 - Corrects the monitor going to sleep during long periods with no input (e.g. during cutscenes).
+- Skip intro logos / legal notices.
+- Debug features
+
+## MGS1 Specific Features
 - Control over Master Collection game patches.
-- ~~Analog input (MGS 1).~~ - Fixed by Konami officially via patch 1.5.0 on 13th March 2024.
-- Deadzone removal (MGS 1).
-- Launcher skip (MGS 1, boots last launched game version).
-- Skip intro logos.
-- Modding support (MGS 1, via Ketchup - see below).
-- Debug features (including stage select menu in MGS 1).
+- Modding / romhack loading support (via Ketchup - see below)
+- Developer Stage Select
+- Fixes analog input range / deadzone
+- Launcher skip (boots last launched game version)
+
 
 ## Installation
 - Grab the latest release of MGSM2Fix from [here](https://github.com/nuggslet/MGSM2Fix/releases) - or the preview release if you're feeling adventurous.
@@ -123,4 +130,6 @@ Countless people in the MGN Discord for testing and encouraging the project alon
 [safetyhook](https://github.com/cursey/safetyhook) for hooking; <br />
 [Squirrel](http://squirrel-lang.org/) for one at least two virtual machines this project tinkers with; <br />
 [Sqrat](https://scrat.sourceforge.net/index.html) for Squirrel bindings in C++; <br />
-[FunctionTraits](https://github.com/HexadigmSystems/FunctionTraits) for improving the safetyhook calling convention experience.
+[FunctionTraits](https://github.com/HexadigmSystems/FunctionTraits) for improving the safetyhook calling convention experience. <br />
+Gamma correction ported from MGSHDFix & based off [SweetFX Shader Suite by CeeJay.dk](https://github.com/CeeJayDK/SweetFX). <br />
+

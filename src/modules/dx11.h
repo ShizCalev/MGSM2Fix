@@ -3,6 +3,7 @@
 #include "m2fixbase.h"
 
 #include <d3d11.h>
+#include <dxgi1_2.h>
 #include <d3dcompiler.h>
 
 class DX11 : public M2FixBase
@@ -444,6 +445,55 @@ protected:
 			D3D_FEATURE_LEVEL   *pFeatureLevel,
 			ID3D11DeviceContext **ppImmediateContext
 		);
+
+		static HRESULT WINAPI CreateDeviceAndSwapChain(
+			IDXGIAdapter               *pAdapter,
+			D3D_DRIVER_TYPE            DriverType,
+			HMODULE                    Software,
+			UINT                       Flags,
+			const D3D_FEATURE_LEVEL    *pFeatureLevels,
+			UINT                       FeatureLevels,
+			UINT                       SDKVersion,
+			const DXGI_SWAP_CHAIN_DESC *pSwapChainDesc,
+			IDXGISwapChain             **ppSwapChain,
+			ID3D11Device               **ppDevice,
+			D3D_FEATURE_LEVEL          *pFeatureLevel,
+			ID3D11DeviceContext        **ppImmediateContext
+		);
+	};
+
+	class Factory {
+	public:
+		static HRESULT WINAPI CreateSwapChainForHwnd(
+			IDXGIFactory2 *pFactory,
+			IUnknown *pDevice,
+			HWND hWnd,
+			const DXGI_SWAP_CHAIN_DESC1 *pDesc,
+			const DXGI_SWAP_CHAIN_FULLSCREEN_DESC *pFullscreenDesc,
+			IDXGIOutput *pRestrictToOutput,
+			IDXGISwapChain1 **ppSwapChain
+		);
+		static HRESULT WINAPI CreateSwapChain(
+			IDXGIFactory         *pFactory,
+			IUnknown             *pDevice,
+			DXGI_SWAP_CHAIN_DESC *pDesc,
+			IDXGISwapChain       **ppSwapChain
+		);
+	};
+
+	class SwapChain {
+	public:
+		static HRESULT WINAPI Present1(
+			IDXGISwapChain1 *pSwapChain,
+			UINT SyncInterval,
+			UINT Flags,
+			const DXGI_PRESENT_PARAMETERS *pPresentParameters
+		);
+		static HRESULT WINAPI Present(
+			IDXGISwapChain *pSwapChain,
+			UINT           SyncInterval,
+			UINT           Flags
+		);
 	};
 
 	virtual void WINAPI UpdateSubresource(
@@ -837,10 +887,67 @@ protected:
 		ID3D11DeviceContext **ppImmediateContext
 	);
 
+	virtual HRESULT WINAPI CreateDeviceAndSwapChain(
+		HRESULT (WINAPI *pFunction)(
+			IDXGIAdapter               *pAdapter,
+			D3D_DRIVER_TYPE            DriverType,
+			HMODULE                    Software,
+			UINT                       Flags,
+			const D3D_FEATURE_LEVEL    *pFeatureLevels,
+			UINT                       FeatureLevels,
+			UINT                       SDKVersion,
+			const DXGI_SWAP_CHAIN_DESC *pSwapChainDesc,
+			IDXGISwapChain             **ppSwapChain,
+			ID3D11Device               **ppDevice,
+			D3D_FEATURE_LEVEL          *pFeatureLevel,
+			ID3D11DeviceContext        **ppImmediateContext
+		),
+		IDXGIAdapter               *pAdapter,
+		D3D_DRIVER_TYPE            DriverType,
+		HMODULE                    Software,
+		UINT                       Flags,
+		const D3D_FEATURE_LEVEL    *pFeatureLevels,
+		UINT                       FeatureLevels,
+		UINT                       SDKVersion,
+		const DXGI_SWAP_CHAIN_DESC *pSwapChainDesc,
+		IDXGISwapChain             **ppSwapChain,
+		ID3D11Device               **ppDevice,
+		D3D_FEATURE_LEVEL          *pFeatureLevel,
+		ID3D11DeviceContext        **ppImmediateContext
+	);
+
+	static void HookFactory(ID3D11Device *pDevice);
+	static void HookPresent(IDXGISwapChain *pSwapChain);
+
+	virtual HRESULT WINAPI CreateSwapChain(
+		HRESULT (WINAPI *pFunction)(
+			IDXGIFactory         *pFactory,
+			IUnknown             *pDevice,
+			DXGI_SWAP_CHAIN_DESC *pDesc,
+			IDXGISwapChain       **ppSwapChain
+		),
+		IDXGIFactory         *pFactory,
+		IUnknown             *pDevice,
+		DXGI_SWAP_CHAIN_DESC *pDesc,
+		IDXGISwapChain       **ppSwapChain
+	);
+
+	virtual HRESULT WINAPI Present(
+		HRESULT (WINAPI *pFunction)(
+			IDXGISwapChain *pSwapChain,
+			UINT           SyncInterval,
+			UINT           Flags
+		),
+		IDXGISwapChain *pSwapChain,
+		UINT           SyncInterval,
+		UINT           Flags
+	);
+
 public:
 	static inline ID3D11Device        *Device           = nullptr;
 	static inline ID3D11DeviceContext *ImmediateContext = nullptr;
 	static inline ID3D11DeviceContext *DeferredContext  = nullptr;
+	static inline IDXGISwapChain      *SwapChain        = nullptr;
 
 	static inline ID3D11VertexShader *upscalerVertexShader = nullptr;
 	static inline ID3D11PixelShader  *upscalerPixelShader  = nullptr;

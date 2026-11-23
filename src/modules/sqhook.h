@@ -99,12 +99,14 @@ private:
     static void TraceNative(HSQUIRRELVM<Q> v, SQFUNCTION<Q> func, SQNativeClosure<Q> *closure, const SQChar *name);
     static void Trace(HSQUIRRELVM<Q> v);
 
+    static SQInteger SQReturn_init_reset_emulator_count(HSQUIRRELVM<Q> v);
     static SQInteger SQReturn_init_system_1st(HSQUIRRELVM<Q> v);
     static SQInteger SQReturn_init_system_last(HSQUIRRELVM<Q> v);
     static SQInteger SQReturn_onInitializeFinish(HSQUIRRELVM<Q> v);
     static SQInteger _SQ_init_emulator_get_arch_sub_info(HSQUIRRELVM<Q> v);
     static SQInteger _SQReturn_update_gadgets(HSQUIRRELVM<Q> v);
 
+    static SQInteger SQReturn_setPause(HSQUIRRELVM<Q> v);
     static SQInteger SQReturn_setSmoothing(HSQUIRRELVM<Q> v);
     static SQInteger SQReturn_set_current_title_dev_id(HSQUIRRELVM<Q> v);
     static SQInteger SQReturn_set_game_regionTag(HSQUIRRELVM<Q> v);
@@ -123,11 +125,15 @@ private:
     static SQInteger _SQReturn_setting_screen_set_parameter_auto_size(HSQUIRRELVM<Q> v);
 
     static SQInteger SQ_util_is_notice_skipable(HSQUIRRELVM<Q> v);
+    static SQInteger SQCall_begin_gameplay(HSQUIRRELVM<Q> v);
+    static SQInteger SQReturn_end_gameplay(HSQUIRRELVM<Q> v);
+    static SQInteger SQCall_mode_logo(HSQUIRRELVM<Q> v);
     static SQInteger SQ_util_get_launch_intent_id(HSQUIRRELVM<Q> v);
     static SQInteger SQ_util_clear_launch_intent_id(HSQUIRRELVM<Q> v);
     static SQInteger SQ_SystemEtc_setStartPadId(HSQUIRRELVM<Q> v);
     static SQInteger SQ_SystemEtc_getStartPadId(HSQUIRRELVM<Q> v);
 
+    static SQInteger SQNative_init(HSQUIRRELVM<Q> v);
     static SQInteger SQNative_setRamValue(HSQUIRRELVM<Q> v);
     static SQInteger SQNative_getRamValue(HSQUIRRELVM<Q> v);
     static std::string CallStack(HSQUIRRELVM<Q> v);
@@ -136,6 +142,7 @@ private:
     static SQInteger SQNative_releaseCdRomPatch(HSQUIRRELVM<Q> v);
     static SQInteger SQNative_setCdRomShellOpen(HSQUIRRELVM<Q> v);
     static SQInteger SQNative_setLogFilename(HSQUIRRELVM<Q> v);
+    static SQInteger SQNative_setPause(HSQUIRRELVM<Q> v);
     static SQInteger SQNative_setDotmatrix(HSQUIRRELVM<Q> v);
     static SQInteger SQNative_entryTexturePatch(HSQUIRRELVM<Q> v);
     static SQInteger SQNative_releaseTexturePatch(HSQUIRRELVM<Q> v);

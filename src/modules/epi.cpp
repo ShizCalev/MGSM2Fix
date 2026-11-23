@@ -3,6 +3,8 @@
 
 void __cdecl EPI::Print0(const char *fmt, ...)
 {
+    if (M2Config::iEmulatorLevel < 1) return;
+
     static std::string buffer;
 
     va_list va;
@@ -27,6 +29,8 @@ void __cdecl EPI::Print0(const char *fmt, ...)
 
 void __cdecl EPI::Print1(const char *fmt, ...)
 {
+    if (M2Config::iEmulatorLevel < 1) return;
+
     static std::string buffer;
 
     va_list va;

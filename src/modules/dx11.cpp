@@ -1,6 +1,7 @@
 #include "m2fix.h"
 
 #include "dx11.h"
+#include "color_correction.hpp"
 
 #if defined(M2FIX_USE_IMGUI)
 #include "imgui.h"
@@ -1711,6 +1712,7 @@ void WINAPI DX11::OMSetRenderTargets(
 
 void DX11::Upscale(ID3D11DeviceContext *pContext)
 {
+#if 0 //old mgs1 upscaler code
     if (!pContext && M2Config::bInternalEnabled) {
         upscalerDisabled = false;
 
@@ -1828,6 +1830,7 @@ void DX11::Upscale(ID3D11DeviceContext *pContext)
             Serve(pContext, upscalerDraws);
         } upscalerDisabled = false;
     }
+#endif
 }
 
 void WINAPI DX11::Immediate::ClearDepthStencilView(
@@ -2346,6 +2349,8 @@ HRESULT WINAPI DX11::CreateDevice(
         ppImmediateContext
     );
 
+    if (FAILED(res) || !ppDevice || !*ppDevice || !ppImmediateContext || !*ppImmediateContext) return res; //G-Darius calls a dummy d3d11 device creation at startup, which returns null pointers here, then uses d3d9 for all its actual rendering.
+
     ID3D11Device *pDevice = *ppDevice;
     if (Device) return res;
     Device = pDevice;
@@ -2359,6 +2364,7 @@ HRESULT WINAPI DX11::CreateDevice(
         );
     }
 
+#if 0 //old mgs1 upscaler code
     M2Hook::GetInstance().VirtualTableHook(
         pDevice, "[D3D11] ID3D11Device"
     );
@@ -2384,10 +2390,12 @@ HRESULT WINAPI DX11::CreateDevice(
         VIRTUAL_HOOK(CreatePixelShader);
     }
     #undef VIRTUAL_HOOK
+#endif
 
     ID3D11DeviceContext *pImmediateContext = *ppImmediateContext;
     ImmediateContext = pImmediateContext;
 
+#if 0 //old mgs1 upscaler code
     M2Hook::GetInstance().VirtualTableHook(
         pImmediateContext, "[D3D11] [Immediate] ID3D11DeviceContext"
     );
@@ -2451,8 +2459,322 @@ HRESULT WINAPI DX11::CreateDevice(
         pDevice->CreateSamplerState(&upscalerSamplerDesc, &upscalerSampler);
         upscalerSampler->AddRef();
     }
+#endif
+
+    HookFactory(pDevice);
+
+    ColorCorrection::Init();
 
     return res;
+}
+
+void DX11::HookFactory(ID3D11Device *pDevice)
+{
+    static bool hooked = false;
+    if (hooked) return;
+
+    IDXGIDevice *pDXGIDevice = nullptr;
+    if (SUCCEEDED(pDevice->QueryInterface(__uuidof(IDXGIDevice), reinterpret_cast<void **>(&pDXGIDevice)))) {
+        IDXGIAdapter *pDXGIAdapter = nullptr;
+        if (SUCCEEDED(pDXGIDevice->GetAdapter(&pDXGIAdapter))) {
+            IDXGIFactory *pDXGIFactory = nullptr;
+            if (SUCCEEDED(pDXGIAdapter->GetParent(__uuidof(IDXGIFactory), reinterpret_cast<void **>(&pDXGIFactory)))) {
+                // CreateSwapChain is always vtable slot 10. Don't use VmtHook for this, as it will try reading invalid memory beyond the actual slot and cause CTD.
+                void **factoryVtable = *reinterpret_cast<void ***>(pDXGIFactory);
+                hooked = M2Hook::GetInstance().Hook(
+                    factoryVtable[10],
+                    DX11::Factory::CreateSwapChain, "[D3D11] IDXGIFactory::CreateSwapChain"
+                );
+                IDXGIFactory2 *pDXGIFactory2 = nullptr;
+                if (SUCCEEDED(pDXGIFactory->QueryInterface(__uuidof(IDXGIFactory2), reinterpret_cast<void **>(&pDXGIFactory2)))) {
+                    void **factory2Vtable = *reinterpret_cast<void ***>(pDXGIFactory2);
+                    M2Hook::GetInstance().Hook(
+                        factory2Vtable[15],
+                        DX11::Factory::CreateSwapChainForHwnd, "[D3D11] IDXGIFactory2::CreateSwapChainForHwnd"
+                    );
+                    pDXGIFactory2->Release();
+                }
+                pDXGIFactory->Release();
+            }
+            pDXGIAdapter->Release();
+        }
+        pDXGIDevice->Release();
+    }
+
+}
+
+HRESULT WINAPI DX11::Device::CreateDeviceAndSwapChain(
+    IDXGIAdapter               *pAdapter,
+    D3D_DRIVER_TYPE            DriverType,
+    HMODULE                    Software,
+    UINT                       Flags,
+    const D3D_FEATURE_LEVEL    *pFeatureLevels,
+    UINT                       FeatureLevels,
+    UINT                       SDKVersion,
+    const DXGI_SWAP_CHAIN_DESC *pSwapChainDesc,
+    IDXGISwapChain             **ppSwapChain,
+    ID3D11Device               **ppDevice,
+    D3D_FEATURE_LEVEL          *pFeatureLevel,
+    ID3D11DeviceContext        **ppImmediateContext
+) {
+    return DX11::GetInstance().CreateDeviceAndSwapChain(
+        DX11::Device::CreateDeviceAndSwapChain,
+        pAdapter,
+        DriverType,
+        Software,
+        Flags,
+        pFeatureLevels,
+        FeatureLevels,
+        SDKVersion,
+        pSwapChainDesc,
+        ppSwapChain,
+        ppDevice,
+        pFeatureLevel,
+        ppImmediateContext
+    );
+}
+
+HRESULT WINAPI DX11::CreateDeviceAndSwapChain(
+    HRESULT (WINAPI *pFunction)(
+        IDXGIAdapter               *pAdapter,
+        D3D_DRIVER_TYPE            DriverType,
+        HMODULE                    Software,
+        UINT                       Flags,
+        const D3D_FEATURE_LEVEL    *pFeatureLevels,
+        UINT                       FeatureLevels,
+        UINT                       SDKVersion,
+        const DXGI_SWAP_CHAIN_DESC *pSwapChainDesc,
+        IDXGISwapChain             **ppSwapChain,
+        ID3D11Device               **ppDevice,
+        D3D_FEATURE_LEVEL          *pFeatureLevel,
+        ID3D11DeviceContext        **ppImmediateContext
+    ),
+    IDXGIAdapter               *pAdapter,
+    D3D_DRIVER_TYPE            DriverType,
+    HMODULE                    Software,
+    UINT                       Flags,
+    const D3D_FEATURE_LEVEL    *pFeatureLevels,
+    UINT                       FeatureLevels,
+    UINT                       SDKVersion,
+    const DXGI_SWAP_CHAIN_DESC *pSwapChainDesc,
+    IDXGISwapChain             **ppSwapChain,
+    ID3D11Device               **ppDevice,
+    D3D_FEATURE_LEVEL          *pFeatureLevel,
+    ID3D11DeviceContext        **ppImmediateContext
+) {
+    HRESULT res = M2Hook::GetInstance().Invoke<HRESULT>(
+        pFunction,
+        pAdapter,
+        DriverType,
+        Software,
+        Flags,
+        pFeatureLevels,
+        FeatureLevels,
+        SDKVersion,
+        pSwapChainDesc,
+        ppSwapChain,
+        ppDevice,
+        pFeatureLevel,
+        ppImmediateContext
+    );
+
+    if (FAILED(res)) return res;
+
+    if (!Device && ppDevice && *ppDevice && ppImmediateContext && *ppImmediateContext) {
+        Device = *ppDevice;
+        ImmediateContext = *ppImmediateContext;
+
+        if (M2Config::iRendererLevel >= 1) {
+            spdlog::info("[D3D11] D3D11CreateDeviceAndSwapChain({}, {}, {}) -> {}",
+                static_cast<int>(DriverType),
+                static_cast<int>(Flags),
+                static_cast<int>(SDKVersion),
+                fmt::ptr(Device)
+            );
+        }
+
+        HookFactory(Device);
+        ColorCorrection::Init();
+    }
+
+    if (!SwapChain && ppSwapChain && *ppSwapChain) {
+        SwapChain = *ppSwapChain;
+
+        if (M2Config::iRendererLevel >= 1) {
+            spdlog::info("[D3D11] D3D11CreateDeviceAndSwapChain({}) -> {}",
+                fmt::ptr(pSwapChainDesc),
+                fmt::ptr(SwapChain)
+            );
+        }
+
+        HookPresent(SwapChain);
+    }
+
+    return res;
+}
+
+HRESULT WINAPI DX11::Factory::CreateSwapChainForHwnd(
+    IDXGIFactory2 *pFactory,
+    IUnknown *pDevice,
+    HWND hWnd,
+    const DXGI_SWAP_CHAIN_DESC1 *pDesc,
+    const DXGI_SWAP_CHAIN_FULLSCREEN_DESC *pFullscreenDesc,
+    IDXGIOutput *pRestrictToOutput,
+    IDXGISwapChain1 **ppSwapChain
+) {
+    HRESULT res = M2Hook::GetInstance().Invoke<HRESULT>(
+        DX11::Factory::CreateSwapChainForHwnd,
+        pFactory,
+        pDevice,
+        hWnd,
+        pDesc,
+        pFullscreenDesc,
+        pRestrictToOutput,
+        ppSwapChain
+    );
+
+    if (FAILED(res) || !ppSwapChain || !*ppSwapChain) return res;
+
+    DX11::SwapChain = *ppSwapChain;
+    if (M2Config::iRendererLevel >= 1) {
+        spdlog::info("[D3D11] IDXGIFactory2::CreateSwapChainForHwnd({}) -> {}",
+            fmt::ptr(hWnd),
+            fmt::ptr(*ppSwapChain)
+        );
+    }
+    DX11::HookPresent(*ppSwapChain);
+    return res;
+}
+
+HRESULT WINAPI DX11::Factory::CreateSwapChain(
+    IDXGIFactory         *pFactory,
+    IUnknown             *pDevice,
+    DXGI_SWAP_CHAIN_DESC *pDesc,
+    IDXGISwapChain       **ppSwapChain
+) {
+    return DX11::GetInstance().CreateSwapChain(
+        DX11::Factory::CreateSwapChain,
+        pFactory,
+        pDevice,
+        pDesc,
+        ppSwapChain
+    );
+}
+
+HRESULT WINAPI DX11::CreateSwapChain(
+    HRESULT (WINAPI *pFunction)(
+        IDXGIFactory         *pFactory,
+        IUnknown             *pDevice,
+        DXGI_SWAP_CHAIN_DESC *pDesc,
+        IDXGISwapChain       **ppSwapChain
+    ),
+    IDXGIFactory         *pFactory,
+    IUnknown             *pDevice,
+    DXGI_SWAP_CHAIN_DESC *pDesc,
+    IDXGISwapChain       **ppSwapChain
+) {
+    HRESULT res = M2Hook::GetInstance().Invoke<HRESULT>(
+        pFunction,
+        pFactory,
+        pDevice,
+        pDesc,
+        ppSwapChain
+    );
+
+    if (FAILED(res) || SwapChain) return res;
+
+    SwapChain = *ppSwapChain;
+
+    if (M2Config::iRendererLevel >= 1) {
+        spdlog::info("[D3D11] IDXGIFactory::CreateSwapChain({}) -> {}",
+            fmt::ptr(pDesc),
+            fmt::ptr(SwapChain)
+        );
+    }
+
+    HookPresent(SwapChain);
+
+    return res;
+}
+
+// Present is always vtable slot 8. Don't use VmtHook for this, as it will try reading invalid memory beyond the actual slot and cause a ctd.
+void DX11::HookPresent(IDXGISwapChain *pSwapChain)
+{
+    void **swapChainVtable = *reinterpret_cast<void ***>(pSwapChain);
+    M2Hook::GetInstance().Hook(
+        swapChainVtable[8],
+        DX11::SwapChain::Present, "[D3D11] IDXGISwapChain::Present"
+    );
+    // Dominus uses Present1 for some reason just to make this even more fun.
+    IDXGISwapChain1 *pSwapChain1 = nullptr;
+    if (SUCCEEDED(pSwapChain->QueryInterface(__uuidof(IDXGISwapChain1), reinterpret_cast<void **>(&pSwapChain1)))) {
+        void **swapChain1Vtable = *reinterpret_cast<void ***>(pSwapChain1);
+        M2Hook::GetInstance().Hook(
+            swapChain1Vtable[22],
+            DX11::SwapChain::Present1, "[D3D11] IDXGISwapChain1::Present1"
+        );
+        pSwapChain1->Release();
+    }
+}
+
+HRESULT WINAPI DX11::SwapChain::Present1(
+    IDXGISwapChain1 *pSwapChain,
+    UINT SyncInterval,
+    UINT Flags,
+    const DXGI_PRESENT_PARAMETERS *pPresentParameters
+) {
+    if (M2Config::iRendererLevel >= 2) {
+        spdlog::info("[D3D11] IDXGISwapChain1::Present1({}, {})", SyncInterval, Flags);
+    }
+    if (!(Flags & DXGI_PRESENT_TEST)) {
+        ColorCorrection::Draw(pSwapChain);
+    }
+    return M2Hook::GetInstance().Invoke<HRESULT>(
+        DX11::SwapChain::Present1,
+        pSwapChain,
+        SyncInterval,
+        Flags,
+        pPresentParameters
+    );
+}
+
+HRESULT WINAPI DX11::SwapChain::Present(
+    IDXGISwapChain *pSwapChain,
+    UINT           SyncInterval,
+    UINT           Flags
+) {
+    return DX11::GetInstance().Present(
+        DX11::SwapChain::Present,
+        pSwapChain,
+        SyncInterval,
+        Flags
+    );
+}
+
+HRESULT WINAPI DX11::Present(
+    HRESULT (WINAPI *pFunction)(
+        IDXGISwapChain *pSwapChain,
+        UINT           SyncInterval,
+        UINT           Flags
+    ),
+    IDXGISwapChain *pSwapChain,
+    UINT           SyncInterval,
+    UINT           Flags
+) {
+    if (M2Config::iRendererLevel >= 2) {
+        spdlog::info("[D3D11] IDXGISwapChain::Present({}, {})",
+            SyncInterval,
+            Flags
+        );
+    }
+    ColorCorrection::Draw(pSwapChain);
+
+    return M2Hook::GetInstance().Invoke<HRESULT>(
+        pFunction,
+        pSwapChain,
+        SyncInterval,
+        Flags
+    );
 }
 
 void DX11::Load()
@@ -2471,7 +2793,9 @@ void DX11::Load()
         return;
     }
 
+#if 0 //old mgs1 upscaler code
     Upscale(nullptr);
+#endif
 
 #if defined(M2FIX_USE_IMGUI)
     Overlay(nullptr);
@@ -2486,14 +2810,41 @@ void DX11::Load()
     auto d3d11_CreateDevice = reinterpret_cast<PFN_D3D11_CREATE_DEVICE>(
         GetProcAddress(d3d11, "D3D11CreateDevice")
     );
-    if (!d3d11_CreateDevice) {
+    if (d3d11_CreateDevice) {
+        M2Hook::GetInstance().Hook(
+            d3d11_CreateDevice,
+            DX11::Device::CreateDevice, "[D3D11] D3D11CreateDevice"
+        );
+    } else {
         spdlog::info("[D3D11] D3D11CreateDevice lookup failed.");
-        return;
     }
-    M2Hook::GetInstance().Hook(
-        d3d11_CreateDevice,
-        DX11::Device::CreateDevice, "[D3D11] D3D11CreateDevice"
+
+    typedef HRESULT (WINAPI *PFN_D3D11_CREATE_DEVICE_AND_SWAP_CHAIN)(
+        IDXGIAdapter               *pAdapter,
+        D3D_DRIVER_TYPE            DriverType,
+        HMODULE                    Software,
+        UINT                       Flags,
+        const D3D_FEATURE_LEVEL    *pFeatureLevels,
+        UINT                       FeatureLevels,
+        UINT                       SDKVersion,
+        const DXGI_SWAP_CHAIN_DESC *pSwapChainDesc,
+        IDXGISwapChain             **ppSwapChain,
+        ID3D11Device               **ppDevice,
+        D3D_FEATURE_LEVEL          *pFeatureLevel,
+        ID3D11DeviceContext        **ppImmediateContext
     );
+
+    auto d3d11_CreateDeviceAndSwapChain = reinterpret_cast<PFN_D3D11_CREATE_DEVICE_AND_SWAP_CHAIN>(
+        GetProcAddress(d3d11, "D3D11CreateDeviceAndSwapChain")
+    );
+    if (d3d11_CreateDeviceAndSwapChain) {
+        M2Hook::GetInstance().Hook(
+            d3d11_CreateDeviceAndSwapChain,
+            DX11::Device::CreateDeviceAndSwapChain, "[D3D11] D3D11CreateDeviceAndSwapChain"
+        );
+    } else {
+        spdlog::info("[D3D11] D3D11CreateDeviceAndSwapChain lookup failed.");
+    }
 }
 
 // Forces the games to run on the user's dedicated GPU in the event that they have

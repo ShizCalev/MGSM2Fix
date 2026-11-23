@@ -4,6 +4,8 @@
 
 #include "m2fixbase.h"
 
+enum class M2System;
+
 // What to do about the collection's replacement for MGS1's Option -> SCREEN
 // help texture. See [Patches] BrightnessText in the ini.
 enum class M2BrightnessText
@@ -64,9 +66,11 @@ public:
     static inline bool bInternalBorderless;
     static inline int iInternalHeight;
     static inline bool bInternalWidescreen;
+    static std::map<M2System, bool> mColorCorrection;
     static inline std::optional<bool> bAnalog;
     static inline std::optional<bool> bSwapSticks;
     static inline bool bRemoveDeadzone;
+    static inline bool bForceStereoAudio = true;
     static inline bool bLauncherSkipNotice;
     static inline bool bLauncherStartGame;
     static inline bool bGameStageSelect;

@@ -11,8 +11,29 @@
 
 #include "config.h"
 #include "borderless.h"
+#include "dx11.h"
+#include "dx9.h"
+#include "stereo_audio_fix.h"
+#include "color_correction.hpp"
 
 #include "versionchecker.h"
+
+enum class M2System
+{
+    None,
+    PlayStation,
+    NES,
+    SNES,
+    MegaDrive,
+    MegaCD,
+    MasterSystem,
+    Arcade,
+    Other,
+    GameBoy,
+    GBA,
+    DS,
+    Count
+};
 
 enum class M2FixGame
 {
@@ -74,6 +95,44 @@ public:
         return std::string(GetInstance().m_sConfigFile);
     }
 
+    static const char* SystemName(M2System system)
+    {
+        switch (system) {
+            case M2System::PlayStation: return "PlayStation";
+            case M2System::NES: return "NES";
+            case M2System::SNES: return "SNES";
+            case M2System::MegaDrive: return "MegaDrive";
+            case M2System::MegaCD: return "MegaCD";
+            case M2System::MasterSystem: return "MasterSystem";
+            case M2System::Arcade: return "Arcade";
+            case M2System::Other: return "Other";
+            case M2System::GameBoy: return "GameBoy";
+            case M2System::GBA: return "GBA";
+            case M2System::DS: return "DS";
+            default: return "None";
+        }
+    }
+
+    static M2System SystemForCore(std::string_view core)
+    {
+        if (core.empty()) return M2System::None;
+        if (core == "psx") return M2System::PlayStation;
+        if (core == "nes") return M2System::NES;
+        if (core == "sfc_cga") return M2System::SNES;
+        if (core == "md") return M2System::MegaDrive;
+        if (core == "megacd") return M2System::MegaCD;
+        if (core == "sms") return M2System::MasterSystem;
+        if (core == "gameboy") return M2System::GameBoy;
+        if (core == "gba") return M2System::GBA;
+        if (core == "dra01" || core == "dra02" || core == "dra03") return M2System::DS;
+        if (core == "contra" || core == "scontra" || core == "ac_dracula" || core == "remake_dracula" ||
+            core == "darius" || core == "darius2" || core == "f3" || core == "fx_101" ||
+            core == "nightstr" || core == "spacegun" || core == "opwolf" || core == "opthunder" ||
+            core == "gradius" || core == "gradius2" || core == "gradius3" ||
+            core == "salamander" || core == "salamander2" || core == "salamander2cnv" || core == "salamander3") return M2System::Arcade;
+        return M2System::Other;
+    }
+
     static M2FixGame Game()
     {
         return GetInstance().m_eGame;
@@ -114,6 +173,15 @@ public:
 
             EPI::LoadInstance();
             SQHook<>::LoadInstance();
+
+            static DX11 dx11;
+            DX11::LoadInstance(&dx11);
+
+            static DX9 dx9;
+            DX9::LoadInstance(&dx9);
+
+            ColorCorrection::Setup();
+            StereoAudioFix::Setup();
 
             if (M2Config::bExternalEnabled) Config::LoadInstance();
             if (M2Config::bExternalBorderless) Borderless::LoadInstance();

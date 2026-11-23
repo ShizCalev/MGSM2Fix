@@ -1,6 +1,20 @@
 #include "m2fix.h"
 #include "m2config.h"
 
+std::map<M2System, bool> M2Config::mColorCorrection = {
+    { M2System::PlayStation, true },
+    { M2System::NES, true },
+    { M2System::SNES, true },
+    { M2System::MegaDrive, true },
+    { M2System::MegaCD, true },
+    { M2System::MasterSystem, true },
+    { M2System::Arcade, true },
+    { M2System::Other, true },
+    { M2System::GameBoy, false },
+    { M2System::GBA, false },
+    { M2System::DS, false },
+};
+
 void M2Config::Load()
 {
     std::array<std::string, 4> directories = { "", "plugins", "scripts", "update" };
@@ -83,6 +97,10 @@ void M2Config::Load()
     inipp::get_value(ini.sections["Internal Resolution"], "Widescreen", bInternalWidescreen);
     inipp::get_value(ini.sections["Internal Resolution"], "Borderless", bInternalBorderless);
 
+    for (auto& [system, enabled] : mColorCorrection) {
+        inipp::get_value(ini.sections["CRT Gamma Correction"], M2Fix::SystemName(system), enabled);
+    }
+
     {
         bool _bAnalog;
         if (inipp::get_value(ini.sections["Input"], "Analog", _bAnalog))
@@ -95,6 +113,7 @@ void M2Config::Load()
     }
 
     inipp::get_value(ini.sections["Input"], "RemoveDeadzone", bRemoveDeadzone);
+    inipp::get_value(ini.sections["Audio"], "ForceStereoAudio", bForceStereoAudio);
 
     inipp::get_value(ini.sections["Launcher"], "SkipNotice", bLauncherSkipNotice);
     inipp::get_value(ini.sections["Launcher"], "StartGame", bLauncherStartGame);
@@ -191,11 +210,20 @@ void M2Config::Load()
     }
 
     if (iExternalWidth <= 0 || iExternalHeight <= 0) {
-        // Grab desktop resolution
-        RECT desktop;
-        GetWindowRect(GetDesktopWindow(), &desktop);
-        iExternalWidth  = static_cast<int>(desktop.right);
-        iExternalHeight = static_cast<int>(desktop.bottom);
+        // Use physical desktop pixels; otherwise DPI-scaled desktop bounds causes Cozmic to open at 200%+ scale.
+        DEVMODE display = {};
+        display.dmSize = sizeof(display);
+        if (EnumDisplaySettings(nullptr, ENUM_CURRENT_SETTINGS, &display)) {
+            iExternalWidth = static_cast<int>(display.dmPelsWidth);
+            iExternalHeight = static_cast<int>(display.dmPelsHeight);
+        }
+        else {
+            // Fall back to desktop bounds if display mode query fails.
+            RECT desktop = {};
+            GetWindowRect(GetDesktopWindow(), &desktop);
+            iExternalWidth = desktop.right - desktop.left;
+            iExternalHeight = desktop.bottom - desktop.top;
+        }
     }
 
     if (iInternalHeight <= 0) {
@@ -230,9 +258,13 @@ void M2Config::Load()
     spdlog::info("[Config] iInternalHeight: {}", iInternalHeight);
     spdlog::info("[Config] bInternalWidescreen: {}", bInternalWidescreen);
     spdlog::info("[Config] bInternalBorderless: {}", bInternalBorderless);
+    for (const auto& [system, enabled] : mColorCorrection) {
+        spdlog::info("[Config] ColorCorrection {}: {}", M2Fix::SystemName(system), enabled);
+    }
     if (bAnalog)     spdlog::info("[Config] bAnalog: {}", *bAnalog);
     if (bSwapSticks) spdlog::info("[Config] bSwapSticks: {}", *bSwapSticks);
     spdlog::info("[Config] bRemoveDeadzone: {}", bRemoveDeadzone);
+    spdlog::info("[Config] bForceStereoAudio: {}", bForceStereoAudio);
     spdlog::info("[Config] bLauncherSkipNotice: {}", bLauncherSkipNotice);
     spdlog::info("[Config] bLauncherStartGame: {}", bLauncherStartGame);
     spdlog::info("[Config] bPatchesDisableRAM: {}", bPatchesDisableRAM);

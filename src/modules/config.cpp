@@ -64,6 +64,8 @@ const char * __fastcall Config::GetCfgValue(uintptr_t *ctx, uintptr_t _EDX, cons
         keys.insert(key);
     }
 
+    if (key == "FORCE_TERMINATE_ON_CLOSE") return "1"; // Fixes alt-f4 not reliably exiting the main thread after main window is destroyed.
+
     if (key == "FULLSCREEN_MODE" || key == "BOOT_FULLSCREEN") {
         return M2Config::sFullscreenMode.c_str();
     }
@@ -74,6 +76,13 @@ const char * __fastcall Config::GetCfgValue(uintptr_t *ctx, uintptr_t _EDX, cons
 
     if (key == "WINDOW_VSYNC") {
         return "0";
+    }
+
+    // Cozmic's saved window position can cause newly created windows to end up off-screen if monitor enumeration has changed (yay for TV -> PC HDMI quirks.)
+	// This forces it to always use your primary monitor for its creation origin.
+    if (M2Fix::Game() == M2FixGame::Darius && M2Config::bExternalBorderless) {
+        if (key == "LAST_WINDOW_POS_ENABLED") return "1";
+        if (key == "LAST_WINDOW_POS_X" || key == "LAST_WINDOW_POS_Y") return "0";
     }
 
     if (key == "WINDOW_W" || key == "SCREEN_W" || key == "LAST_CLIENT_SIZE_X") {
@@ -116,6 +125,10 @@ int __fastcall Config::GetCfgValueEx(uintptr_t *ctx, uintptr_t _EDX, const M2Int
     // This is a fallback approach where instead of returning `const char *` we return an out-of-bounds index into a `std::string` table.
     // Usual caveat around `std::string`: we actually use `M2InteropString` so that our Debug build can be compatible with a Release game.
     M2InteropString *result = nullptr;
+
+    if (key == "FORCE_TERMINATE_ON_CLOSE") {  // Fixes alt-f4 not reliably exiting the main thread after main window is destroyed.
+        result = new M2InteropString("1");
+    }
 
     if (key == "FULLSCREEN_MODE" || key == "BOOT_FULLSCREEN") {
         result = new M2InteropString(M2Config::sFullscreenMode.c_str());

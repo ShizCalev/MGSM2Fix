@@ -13,13 +13,77 @@
 #include "m2/epi.h"
 #include "ketchup.h"
 
+namespace
+{
+    std::mutex coreMutex;
+    std::string activeCore;
+    std::string loadedCore;
+    // Counts current number of play_standalone/play_rankingattack calls that haven't returned yet
+    unsigned gameplayDepth = 0;
+    bool coreReported = false;
+
+    void PublishCore(const std::string& arch, M2System system)
+    {
+        if (coreReported && activeCore == arch && SQEmuState::activeSystem.load(std::memory_order_relaxed) == system) return;
+        activeCore = arch;
+        SQEmuState::activeSystem.store(system, std::memory_order_relaxed);
+        coreReported = true;
+        const char* name = activeCore.empty() ? M2Fix::SystemName(system) : activeCore.c_str();
+        spdlog::info("Active emulation core '{}' | System: {}", name, M2Fix::SystemName(system));
+        ColorCorrection::OnCoreChanged();
+    }
+}
+
+void SQEmuState::SetCore(std::string arch)
+{
+    std::transform(arch.begin(), arch.end(), arch.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    std::lock_guard lock(coreMutex);
+    loadedCore = std::move(arch);
+    // M2 can preload a core at start-up/in the main menu; only mark it active during actual gameplay.
+    PublishCore(gameplayDepth ? loadedCore : std::string{}, gameplayDepth ? M2Fix::SystemForCore(loadedCore) : M2System::None);
+}
+
+void SQEmuState::SetSystem(M2System system)
+{
+    std::lock_guard lock(coreMutex);
+    loadedCore.clear();
+    PublishCore({}, system);
+}
+
+void SQEmuState::BeginGameplay()
+{
+    std::lock_guard lock(coreMutex);
+    ++gameplayDepth;
+    PublishCore(loadedCore, M2Fix::SystemForCore(loadedCore));
+}
+
+void SQEmuState::EndGameplay()
+{
+    std::lock_guard lock(coreMutex);
+    if (gameplayDepth) --gameplayDepth;
+    // Keep the core flagged as active until the outermost gameplay call returns to the main menu.
+    if (!gameplayDepth) PublishCore({}, M2System::None);
+}
+
+std::string SQEmuState::GetCore()
+{
+    std::lock_guard lock(coreMutex);
+    return activeCore;
+}
+
 template <Squirk Q>
 std::vector<std::pair<std::string, SQFUNCTION<Q>>> SQHook<Q>::CallTable = {
+    {"play_standalone",                         SQCall_begin_gameplay},
+    {"play_rankingattack",                      SQCall_begin_gameplay},
+    {"mode_logo",                               SQCall_mode_logo},
     {"util_load_script",                        SQCall_util_load_script},
 };
 
 template <Squirk Q>
 std::vector<std::pair<std::string, SQFUNCTION<Q>>> SQHook<Q>::ReturnTable = {
+    {"play_standalone",                         SQReturn_end_gameplay},
+    {"play_rankingattack",                      SQReturn_end_gameplay},
+    {"init_reset_emulator_count",               SQReturn_init_reset_emulator_count},
     {"init_system_1st",                         SQReturn_init_system_1st},
     {"init_system_last",                        SQReturn_init_system_last},
     {"_update_gadgets",                         _SQReturn_update_gadgets},
@@ -28,6 +92,7 @@ std::vector<std::pair<std::string, SQFUNCTION<Q>>> SQHook<Q>::ReturnTable = {
     {"set_current_title_dev_id",                SQReturn_set_current_title_dev_id},
     {"set_game_regionTag",                      SQReturn_set_game_regionTag},
     {"onInitializeFinish",                      SQReturn_onInitializeFinish},
+    {"setPause",                               SQReturn_setPause},
     {"setSmoothing",                            SQReturn_setSmoothing},
     {"_setting_screen_set_parameter_auto_size", _SQReturn_setting_screen_set_parameter_auto_size},
     {"util_get_multimonitor_screen_bounds",     SQReturn_util_get_multimonitor_screen_bounds},
@@ -48,6 +113,7 @@ std::vector<std::pair<std::string, SQFUNCTION<Q>>> SQHook<Q>::LoadScriptTable = 
 
 template <Squirk Q>
 std::vector<std::pair<const SQChar *, SQFUNCTION<Q>>> SQHook<Q>::NativeTable = {
+    {"init",                                    SQNative_init},
     {"setRamValue",                             SQNative_setRamValue},
     {"getRamValue",                             SQNative_getRamValue},
     {"entryCdRomPatch",                         SQNative_entryCdRomPatch},
@@ -55,6 +121,7 @@ std::vector<std::pair<const SQChar *, SQFUNCTION<Q>>> SQHook<Q>::NativeTable = {
     {"setCdRomShellOpen",                       SQNative_setCdRomShellOpen},
     {"setupCdRom",                              SQNative_setupCdRom},
     {"setLogFilename",                          SQNative_setLogFilename},
+    {"setPause",                                SQNative_setPause},
     {"setDotmatrix",                            SQNative_setDotmatrix},
     {"entryTexturePatch",                       SQNative_entryTexturePatch},
     {"releaseTexturePatch",                     SQNative_releaseTexturePatch},
@@ -320,6 +387,33 @@ SQInteger SQHook<Q>::SQ_util_is_notice_skipable(HSQUIRRELVM<Q> v)
 }
 
 template <Squirk Q>
+SQInteger SQHook<Q>::SQCall_begin_gameplay(HSQUIRRELVM<Q> v)
+{
+    SQEmuState::BeginGameplay();
+    return 0;
+}
+
+template <Squirk Q>
+SQInteger SQHook<Q>::SQReturn_end_gameplay(HSQUIRRELVM<Q> v)
+{
+    SQEmuState::EndGameplay();
+    return 0;
+}
+
+template <Squirk Q>
+SQInteger SQHook<Q>::SQCall_mode_logo(HSQUIRRELVM<Q> v)
+{
+    if (!M2Config::bLauncherSkipNotice) return 0;
+    if (SQHelper<Q>::GetParameter(2, v).GetType() != OT_NULL) return 0;
+    auto list = SQHelper<Q>::GetParameter(1, v);
+    if (list.GetType() != OT_ARRAY) return 0;
+    sq_pushobject(v, list.GetObject());
+    sq_arrayresize(v, -1, 0);
+    sq_pop(v, 1);
+    return 0;
+}
+
+template <Squirk Q>
 SQInteger SQHook<Q>::SQ_util_get_launch_intent_id(HSQUIRRELVM<Q> v)
 {
     if (LaunchIntent)
@@ -451,6 +545,35 @@ SQInteger SQHook<Q>::SQReturn_constructor(HSQUIRRELVM<Q> v)
 }
 
 template <Squirk Q>
+SQInteger SQHook<Q>::SQNative_init(HSQUIRRELVM<Q> v)
+{
+    HSQOBJECT<Q> receiver;
+    if (SQ_FAILED(sq_getstackobj(v, 1, &receiver))) return 0;
+    auto task = Sqrat::RootTable<Q>(v).GetSlot("g_emu_task");
+    if (task.IsNull() || obj_type(receiver) != obj_type(task.GetObject()) || _rawval(receiver) != _rawval(task.GetObject())) return 0;
+
+    SQEmuState::SetCore({});
+    SQEmuState::paused.store(true, std::memory_order_relaxed);
+    const SQChar* arch = nullptr;
+    if (SQ_SUCCEEDED(sq_getstring(v, 4, &arch)) && arch) SQEmuState::SetCore(arch);
+    return 0;
+}
+
+template <Squirk Q>
+SQInteger SQHook<Q>::SQReturn_init_reset_emulator_count(HSQUIRRELVM<Q> v)
+{
+    SQReturn_setPause(v);
+    Sqrat::Table<Q> task(Sqrat::RootTable<Q>(v).GetSlot("g_emu_task").GetObject(), v);
+    if (task.IsNull()) return 0;
+    auto getter = task.GetFunction("getArch");
+    if (getter.IsNull()) return 0;
+    auto result = getter.template Evaluate<std::string>();
+    if (!result || result->empty()) return 0;
+    SQEmuState::SetCore(*result);
+    return 0;
+}
+
+template <Squirk Q>
 SQInteger SQHook<Q>::SQReturn_init_system_1st(HSQUIRRELVM<Q> v)
 {
     if (M2Config::bLauncherSkipNotice) {
@@ -495,6 +618,36 @@ SQInteger SQHook<Q>::_SQReturn_update_gadgets(HSQUIRRELVM<Q> v)
     Ketchup<Q>::Update();
     M2Fix::GameInstance().SQOnUpdateGadgets();
     Command();
+    return 0;
+}
+
+template <Squirk Q>
+SQInteger SQHook<Q>::SQReturn_setPause(HSQUIRRELVM<Q> v)
+{
+    Sqrat::Table<Q> task(Sqrat::RootTable<Q>(v).GetSlot("g_emu_task").GetObject(), v);
+    bool paused = true;
+    if (!task.IsNull()) {
+        auto getter = task.GetFunction("getPause");
+        if (!getter.IsNull()) {
+            auto result = getter.template Evaluate<bool>();
+            if (!(!result)) paused = *result;
+        }
+    }
+    SQEmuState::paused.store(paused, std::memory_order_relaxed);
+    return 0;
+}
+
+template <Squirk Q>
+SQInteger SQHook<Q>::SQNative_setPause(HSQUIRRELVM<Q> v)
+{
+    SQBool paused;
+    HSQOBJECT<Q> receiver;
+    if (SQ_FAILED(sq_getbool(v, 2, &paused)) || SQ_FAILED(sq_getstackobj(v, 1, &receiver))) return 0;
+
+    auto task = Sqrat::RootTable<Q>(v).GetSlot("g_emu_task");
+    if (!task.IsNull() && obj_type(receiver) == obj_type(task.GetObject()) && _rawval(receiver) == _rawval(task.GetObject())) {
+        SQEmuState::paused.store(paused != 0, std::memory_order_relaxed);
+    }
     return 0;
 }
 
@@ -792,6 +945,8 @@ SQInteger SQHook<Q>::_SQReturn_get_disk_path(HSQUIRRELVM<Q> v)
 template <Squirk Q>
 SQInteger SQHook<Q>::SQReturn_onInitializeFinish(HSQUIRRELVM<Q> v)
 {
+    SQReturn_init_reset_emulator_count(v);
+
     if (InitializeFinishCount == 0) {
         for (auto & Machine : M2Fix::GameInstance().MachineInstances()) {
             Machine.get().BindModules();

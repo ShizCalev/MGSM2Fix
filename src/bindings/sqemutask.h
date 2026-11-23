@@ -44,6 +44,15 @@ public:
 		return SQEmuTask().Invoke<void>(__func__, enable);
 	}
 
+	static SQBool GetPause()
+	{
+		return SQEmuTask().Invoke<SQBool>(__func__);
+	}
+	static void SetPause(SQBool enable)
+	{
+		return SQEmuTask().Invoke<void>(__func__, enable);
+	}
+
 	static SQBool GetScanline() {
 		return SQEmuTask().Invoke<SQBool>(__func__);
 	}
@@ -120,3 +129,22 @@ template SQEmuTask<Squirk::Standard>;
 template SQEmuTask<Squirk::AlignObject>;
 template SQEmuTask<Squirk::StandardShared>;
 template SQEmuTask<Squirk::AlignObjectShared>;
+
+
+enum class M2System;
+
+namespace SQEmuState
+{
+    inline std::atomic<M2System> activeSystem{};
+    void SetCore(std::string arch);
+    void SetSystem(M2System system);
+    void BeginGameplay();
+    void EndGameplay();
+    std::string GetCore();
+    inline std::atomic<bool> paused = true;
+}
+
+inline bool SQEmuTask_IsPaused()
+{
+    return SQEmuState::paused.load(std::memory_order_relaxed);
+}
