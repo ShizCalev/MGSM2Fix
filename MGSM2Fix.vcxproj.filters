@@ -105,6 +105,9 @@
     <ClCompile Include="src\modules\stereo_audio_fix.cpp">
       <Filter>Modules</Filter>
     </ClCompile>
+    <ClCompile Include="src\modules\alt_f4_hang_fix.cpp">
+      <Filter>Modules</Filter>
+    </ClCompile>
     <ClCompile Include="src\modules\color_correction.cpp">
       <Filter>Modules</Filter>
     </ClCompile>
@@ -366,6 +369,9 @@
       <Filter>Modules</Filter>
     </ClInclude>
     <ClInclude Include="src\modules\stereo_audio_fix.h">
+      <Filter>Modules</Filter>
+    </ClInclude>
+    <ClInclude Include="src\modules\alt_f4_hang_fix.h">
       <Filter>Modules</Filter>
     </ClInclude>
     <ClInclude Include="src\modules\color_correction.hpp">

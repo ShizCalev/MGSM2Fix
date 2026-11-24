@@ -209,13 +209,21 @@ int __fastcall Config::GetCfgValueEx(uintptr_t *ctx, uintptr_t _EDX, const M2Int
 #endif
 }
 
+#ifdef _WIN64
+int Config::GetCfgInt(uintptr_t *ctx, const M2InteropString *id) //// Fixes alt-f4 not reliably exiting the main thread after main window is destroyed. Ray'z bypasses the regular GetCfgValue() stuff.
+{
+    const bool forceClose = std::string_view(id->c_str()) == "FORCE_TERMINATE_ON_CLOSE";
+    const int value = M2Hook::GetInstance().Invoke<int>(GetCfgInt, ctx, id);
+    return forceClose ? 1 : value;
+}
+#endif
+
 void Config::Load()
 {
     switch (M2Fix::Game())
     {
 #ifndef _WIN64
         case M2FixGame::MGS1:
-#endif
         case M2FixGame::Contra:
         case M2FixGame::Dracula:
         case M2FixGame::DraculaAdvance:
@@ -251,12 +259,19 @@ void Config::Load()
             break;
         }
 
-#ifdef _WIN64
+#else
+        case M2FixGame::Ray:
+        {
+            M2Hook::GetInstance().Hook(
+                "48 89 5C 24 ?? 57 48 83 EC ?? 48 8B 05 ?? ?? ?? ?? 48 33 C4 48 89 44 24 ?? 48 8B FA 48 8B D9 48 89 54 24 ?? 48 8D 4C 24 ?? E8 ?? ?? ?? ?? 48 8B D0 48 8B CB E8 ?? ?? ?? ?? 48 85 C0",
+                0, GetCfgInt, "[Config-64] MWinResCfg::GetInt"
+            );
+        }
+        [[fallthrough]];
+
         case M2FixGame::MGS1:
-#endif
         case M2FixGame::MGSR:
         case M2FixGame::DraculaDominus:
-        case M2FixGame::Ray:
         case M2FixGame::Gradius:
         {
             M2Hook::GetInstance().Hook(
@@ -280,6 +295,7 @@ void Config::Load()
             break;
         }
 
+#endif
         default: break;
     }
 }

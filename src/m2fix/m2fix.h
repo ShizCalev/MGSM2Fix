@@ -14,6 +14,9 @@
 #include "dx11.h"
 #include "dx9.h"
 #include "stereo_audio_fix.h"
+#ifndef _WIN64
+#include "alt_f4_hang_fix.h"
+#endif
 #include "color_correction.hpp"
 
 #include "versionchecker.h"
@@ -125,12 +128,18 @@ public:
         if (core == "gameboy") return M2System::GameBoy;
         if (core == "gba") return M2System::GBA;
         if (core == "dra01" || core == "dra02" || core == "dra03") return M2System::DS;
-        if (core == "contra" || core == "scontra" || core == "ac_dracula" || core == "remake_dracula" ||
-            core == "darius" || core == "darius2" || core == "f3" || core == "fx_101" ||
-            core == "nightstr" || core == "spacegun" || core == "opwolf" || core == "opthunder" ||
-            core == "gradius" || core == "gradius2" || core == "gradius3" ||
-            core == "salamander" || core == "salamander2" || core == "salamander2cnv" || core == "salamander3") return M2System::Arcade;
-        return M2System::Other;
+
+        if (core == "contra" || core == "scontra" ||      // Contra Anniversary Collection
+            core == "ac_dracula" ||                       // Castlevania Anniversary Collection
+            core == "remake_dracula" ||                   // Castlevania Dominus Collection
+            core == "darius" || core == "darius2" ||      // Darius Cozmic Collection Arcade
+            core == "f3" ||                               // Darius Cozmic Collection Arcade & Ray'z Arcade Chronology
+            core == "fx_101" ||                           // G-Darius HD
+            core == "fx" || core == "gnet" ||             // Ray'z Arcade Chronology
+            core == "nightstr" || core == "spacegun" || core == "opwolf" || core == "opthunder" ||        // Operation Night Strikers
+            core == "gradius" || core == "gradius2" || core == "gradius3" || core == "salamander" || core == "salamander2" || core == "salamander2cnv" || core == "salamander3") return M2System::Arcade; // Gradius Origins
+
+        return M2System::Other; // fallback for future M2 cores that we don't have mapped yet.
     }
 
     static M2FixGame Game()
@@ -162,6 +171,8 @@ public:
 
         if (M2Fix::DetectGame())
         {
+            M2Utils::CreateSteamAppId();
+			
             spdlog::info("{} v{} started for {}.",
                 M2Fix::FixName(),
                 M2Fix::FixVersion(),
@@ -171,6 +182,8 @@ public:
 
             if (M2Config::bConsole) M2Fix::Console();
 
+            SetProcessDPIAware(); // fixes window size when launched through vs debug when DPI scaling is > 100%
+				
             EPI::LoadInstance();
             SQHook<>::LoadInstance();
 
@@ -183,6 +196,9 @@ public:
             ColorCorrection::Setup();
             StereoAudioFix::Setup();
 
+#ifndef _WIN64
+            AltF4HangFix::Setup();
+#endif
             if (M2Config::bExternalEnabled) Config::LoadInstance();
             if (M2Config::bExternalBorderless) Borderless::LoadInstance();
 

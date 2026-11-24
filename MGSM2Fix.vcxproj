@@ -78,6 +78,7 @@
     <ClCompile Include="src\modules\dx11.cpp" />
     <ClCompile Include="src\modules\dx9.cpp" />
     <ClCompile Include="src\modules\stereo_audio_fix.cpp" />
+    <ClCompile Include="src\modules\alt_f4_hang_fix.cpp" />
     <ClCompile Include="src\m2fix\ketchup.cpp" />
     <ClCompile Include="src\m2fix\m2config.cpp" />
     <ClCompile Include="src\modules\epi.cpp" />
@@ -98,6 +99,7 @@
     <ClInclude Include="src\modules\dx11.h" />
     <ClInclude Include="src\modules\dx9.h" />
     <ClInclude Include="src\modules\stereo_audio_fix.h" />
+    <ClInclude Include="src\modules\alt_f4_hang_fix.h" />
     <ClInclude Include="src\modules\epi.h" />
     <ClInclude Include="src\extern\inipp\inipp\inipp.h" />
     <ClInclude Include="src\extern\json\include\nlohmann\json.hpp" />

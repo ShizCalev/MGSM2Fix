@@ -7,6 +7,35 @@
 #include "warning_background_shuffle.hpp"
 #pragma comment(lib, "setupapi.lib")
 
+void M2Utils::CreateSteamAppId() // automatically creates a steam_appid.txt so we can launch vs debug.
+{								 // a happy little side-effect is that this also lets people launch mgs1in4 directly. :3
+    const auto* game = M2Fix::GameInfo();
+    if (!game || game->id <= 0) return;
+
+    const auto path = M2Hook::GetInstance().ModuleLocation().parent_path() / "steam_appid.txt";
+    const HANDLE file = CreateFileW(path.c_str(), GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (file == INVALID_HANDLE_VALUE) {
+        const DWORD error = GetLastError();
+        if (error != ERROR_FILE_EXISTS && error != ERROR_ALREADY_EXISTS) {
+            spdlog::warn("[Steam Debug AppID] Could not create {} (error {}).", path.string(), error);
+        }
+        return;
+    }
+
+    const auto appId = std::to_string(game->id);
+    DWORD written = 0;
+    const BOOL success = WriteFile(file, appId.data(), static_cast<DWORD>(appId.size()), &written, nullptr);
+    const DWORD error = success ? ERROR_WRITE_FAULT : GetLastError();
+    CloseHandle(file);
+
+    if (success && written == appId.size()) {
+        spdlog::info("[Steam Debug AppID] Created steam_appid.txt for {} (AppID: {})", game->title, game->id);
+    }
+    else {
+        spdlog::warn("[Steam Debug AppID] Could not write {} (error {}).", path.string(), error);
+    }
+}
+
 std::filesystem::path M2Utils::EnsureAppData()
 {
     std::filesystem::path path = std::getenv("APPDATA");

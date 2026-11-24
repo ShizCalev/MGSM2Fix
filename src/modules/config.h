@@ -25,6 +25,7 @@ private:
 #ifdef _WIN64
 	static const char *GetCfgValue(uintptr_t *ctx, const M2InteropString id, int index);
 	static int GetCfgValueEx(uintptr_t *ctx, const M2InteropString *id);
+	static int GetCfgInt(uintptr_t *ctx, const M2InteropString *id);
 
 #else
 	static const char * __fastcall GetCfgValue(uintptr_t *ctx, uintptr_t _EDX, const M2InteropString id, int index);

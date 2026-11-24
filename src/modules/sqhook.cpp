@@ -109,6 +109,7 @@ template <Squirk Q>
 std::vector<std::pair<std::string, SQFUNCTION<Q>>> SQHook<Q>::LoadScriptTable = {
     {"pause_main_mgs",                          SQLoadScript_pause_main_mgs},
     {"mode_title_select_mgs",                   SQLoadScript_mode_title_select_mgs},
+    {"mode_title_select_logo",                  SQLoadScript_mode_title_select_logo},
 };
 
 template <Squirk Q>
@@ -227,15 +228,15 @@ void SQHook<Q>::NewClosure(HSQUIRRELVM<Q> v, SQFUNCTION<Q> func, SQUnsignedInteg
 void __fastcall SQHook<Q>::NewClosure(HSQUIRRELVM<Q> v, uintptr_t _EDX, SQFUNCTION<Q> func, SQUnsignedInteger nfreevars)
 #endif
 {
-    SQObjectPtr<Q> &key = v->GetUp(-1);
-    const SQChar* name = sq_objtostring(&key);
-
 #ifdef _WIN64
     M2Hook::GetInstance().Invoke<void>(NewClosure, v, func, nfreevars);
 #else
     M2Hook::GetInstance().Invoke<void>(NewClosure, v, _EDX, func, nfreevars);
 #endif
 
+    if (sq_gettop(v) < 2) return;
+    SQObjectPtr<Q> &key = v->GetUp(-2);
+    const SQChar* name = sq_objtostring(&key);
     if (!name) return;
 
     SQObjectPtr<Q> &obj = v->GetUp(-1);
@@ -487,6 +488,18 @@ SQInteger SQHook<Q>::SQLoadScript_pause_main_mgs(HSQUIRRELVM<Q> v)
     Sqrat::RootTable root = Sqrat::RootTable<Q>();
     Sqrat::Object<Q> object = root.GetSlot("MenuModePauseMgsOptionScreen");
     HookMethod(v, object.GetObject(), "_is_highp", _SQ_MenuModePauseMgsOptionScreen_is_highp);
+    return 0;
+}
+
+template <Squirk Q>
+SQInteger SQHook<Q>::SQLoadScript_mode_title_select_logo(HSQUIRRELVM<Q> v)
+{
+    if (!M2Config::bLauncherSkipNotice) return 0;
+    Sqrat::RootTable<Q> root(v);
+    for (const char* name : { "mode_title_select_logo_main", "mode_title_select_logo_bb_main", "mode_title_select_logo_m2_main" }) { // Namco arcade splashscreens
+        if (root.GetFunction(name).IsNull()) continue;
+        HookFunction(v, name, [](HSQUIRRELVM<Q>) -> SQInteger { return 0; });
+    }
     return 0;
 }
 
@@ -1067,7 +1080,11 @@ SQInteger SQHook<Q>::HookNative(HSQUIRRELVM<Q> v)
         TraceNative(v, func, closure, name);
     }
 
-    if (name && (strcmp(name, "printf") == 0 || strcmp(name, "print") == 0)) {
+    bool logPrint = name && strcmp(name, "print") == 0;
+#ifdef _WIN64
+    if (logPrint && M2Fix::Game() == M2FixGame::Gradius && sq_gettype(v, 1) == OT_INSTANCE) logPrint = false; // Gradius origin's menu strings pass through print() every frame.
+#endif
+    if (logPrint || (name && strcmp(name, "printf") == 0)) {
         SQChar *cstr = nullptr;
         SQInteger length = 0;
         const SQChar *format = SQHelper<Q>::GetObject(2).Cast<const SQChar *>();

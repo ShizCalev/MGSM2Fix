@@ -116,6 +116,7 @@ private:
     static SQInteger SQReturn_constructor(HSQUIRRELVM<Q> v);
     static SQInteger SQLoadScript_pause_main_mgs(HSQUIRRELVM<Q> v);
     static SQInteger SQLoadScript_mode_title_select_mgs(HSQUIRRELVM<Q> v);
+    static SQInteger SQLoadScript_mode_title_select_logo(HSQUIRRELVM<Q> v);
     static SQInteger _SQ_MenuModeTitleMgsOptionScreen_is_highp(HSQUIRRELVM<Q> v);
     static SQInteger _SQ_MenuModePauseMgsOptionScreen_is_highp(HSQUIRRELVM<Q> v);
     static SQInteger _SQReturn_get_disk_path(HSQUIRRELVM<Q> v);

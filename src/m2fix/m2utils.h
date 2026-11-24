@@ -12,6 +12,8 @@ public:
 
 	static void LogSystemInfo();
 
+	static void CreateSteamAppId();
+
 	static void CompatibilityWarnings();
 
 	static void DisableWindowsFullscreenOptimization();
